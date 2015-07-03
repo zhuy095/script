@@ -129,11 +129,11 @@ def l3_send_pack(pcap_files):
 
 
 if mode == "2":
-    print "path:",get_file_path(path)
+#    print "path:",get_file_path(path)
     
     l2_send_pack(get_file_path(path))
 elif mode == "3":
-    print "path:",get_file_path(path)
+#    print "path:",get_file_path(path)
     l3_send_pack(get_file_path(path))
 else:
     print "replay.conf mode error"
