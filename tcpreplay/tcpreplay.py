@@ -42,7 +42,7 @@ dest_port_num=find_value("dest_port_num")
 def get_ip(ip,num):
     ip_new=[]
     ip_new[0]=ip
-    for i in range(num-1)
+    for i in range(num-1):
         ip_start=ip.split('.')
         if ip_start[3]+i > 254 :
             ip4=(ip_start[3]+i)%254
