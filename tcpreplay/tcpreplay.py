@@ -155,6 +155,9 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
         print "tcpprep error info:",tcpprep_pipe.stderr.read()    
 
 def l3_send_packs(pcap_files):
+    time_span=0.2
+    threads=[]
+    thread_num=0
     s_ip=get_ip(sour_start_ip,sour_ip_num)
     d_ip=get_ip(dest_start_ip,dest_ip_num)
     for pcap in pcap_files:
@@ -162,10 +165,21 @@ def l3_send_packs(pcap_files):
             smac_c=ip_to_mac(s_ip[snum])
             for dnum in range(int(dest_ip_num)):
                 smac_s=ip_to_mac(d_ip[dnum])
-                thread_num=0
-                l3_send_pack(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum])
-
-
+                thread=threading.Thread(target=l3_send_pack,args=(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
+                thread.setDaemon(True)
+                threads.append(thread)
+                thread.start()
+                thread_num+=1
+                while int(thread_num) >= int(concurrent):
+                    time.sleep(time_span)
+                    thread_num=len(threads)
+                    thread_num=thread_alive_num(threads)
+    time.sleep(1)
+    print "\nwaiting for tcpreplay complite!!\n"
+    while int(thread_num) != int(0):
+        time.sleep(time_span)
+        thread_num=thread_alive_num(threads)
+#                l3_send_pack(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum])
 
 if int(mode) == int(2):
     l2_send_packs(get_file_path(path))
