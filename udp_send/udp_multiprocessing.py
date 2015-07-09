@@ -130,8 +130,7 @@ def send_arp(sfile,pcaps):
     for i in range(len(pcaps)):
         sfile.send(pcaps[i])
     time.sleep(30)
-    if que.empty()==False:
-        send_arp(sfile,pcaps)
+    send_arp(sfile,pcaps)
 
 def handler(signum,frame):
     for i in pro:
@@ -172,15 +171,16 @@ try:
     pro.append(t)
     t=multiprocessing.Process(target=send_socket,args=(s_file,src_send_pcaps,int(run_time),))
     pro.append(t)
-    t=multiprocessing.Process(target=send_socket,args=(s_file,src_send_pcaps,int(run_time),))
+    t=multiprocessing.Process(target=send_socket,args=(d_file,dest_send_pcaps,int(run_time),))
     pro.append(t)
     
     for t in pro:
         t.daemon=False
         t.start()
-    #    t.join()
+        #t.join()
     
     print("\nEnter Ctrl+c to stop...")
     
 except:
-    handler()
+    #handler()
+    print("have error,exit")
