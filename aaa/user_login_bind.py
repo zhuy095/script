@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import httplib,re,time,urllib,multiprocessing,signal,socket
+import httplib,re,time,urllib,multiprocessing,signal,socket,subprocess
 
 class HTTPConnection_with_ip_binding(httplib.HTTPConnection):
     def __init__(self, host, port=None, strict=None,timeout=socket._GLOBAL_DEFAULT_TIMEOUT, bindip=None):
@@ -27,7 +27,7 @@ class HTTPConnection_with_ip_binding(httplib.HTTPConnection):
         if not self.sock:
             raise socket.error, msg
 
-def get_ip(ip,num):
+def get_ip(ip,num,ether,netmask):
     ip_new_list=[]
     ip_new_list.append(ip)
     ip_n=ip.split('.')
@@ -45,6 +45,13 @@ def get_ip(ip,num):
                    ip_n[1]=int(tmp)%254
                    ip_n[0]=int(ip_n[0])+int(tmp)/254
         ip_new_list.append(str(ip_n[0])+"."+str(ip_n[1])+"."+str(ip_n[2])+"."+str(ip_n[3]))
+    for i in range(len(ip_new_list)):
+#        print("ether:%s;i :%s"%(ether,i))
+        cmd='ifconfig '+ether+':'+str(i)+' '+ip_new_list[i]+netmask+' up'
+        ip_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        ip_pipe.wait()
+        if ip_pipe.returncode!=0 :
+            print("add local ip %s fail"%ip_new_list[i])
     return ip_new_list
 
 def user_login(localip,key):
@@ -74,22 +81,45 @@ def user_login(localip,key):
     conn.request('POST',posturl,sendbody,sendheader)
     httpers=conn.getresponse()
     http=httpers.read()
-    print("%s login result:%s"%(localip,http))
+    if None != re.search("true",http):
+        print("%s login success"%localip)
+    elif None != re.search("false",http):
+        print("%s login fail"%locaoip)
+#    print("%s login result:%s"%(localip,urllib.quote(http)))
+#    print("%s login result:%s"%(localip,http))
+    #print("%s login result:%s"%(localip,http['result']))
     conn.close()
 
+def del_ip():
+    for i in range(len(ipg)):
+        cmd='ifconfig '+eth+':'+str(i)+'  down'
+        ip_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        ip_pipe.wait()
+        if ip_pipe.returncode!=0 :
+            print("del local ip %s fail"%ipg[i])
+ 
 def handler(signum,frame):
     pool.terminate()
-    print "closed tcprelay!"
+    del_ip()
+    print "stop login!"
 
-localip='192.168.222.15'
-key='vj2'
-process_num=100
+start_ip='192.168.222.1'
+key='2wa'
+process_num=190
+eth='eth1'
+netmask='/16'
 
 signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGHUP, handler)
 signal.signal(signal.SIGTERM, handler)
 
+global pool,login_num
 pool=multiprocessing.Pool(processes=process_num)
-
-ipg=get_ip(ip,100)
-
+#login_num=0
+ipg=get_ip(start_ip,100,eth,netmask)
+for i in range(len(ipg)):
+   pool.apply_async(user_login,(ipg[i],key,))
+pool.close()
+pool.join()
+#print("login success %i"%login_num)
+del_ip()
