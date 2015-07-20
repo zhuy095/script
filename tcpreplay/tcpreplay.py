@@ -23,8 +23,8 @@ def find_value(key):
     return a[1].replace('\n','')
 
 mode=find_value("mode")
-eth0=find_value("cinter")
-eth1=find_value("sinter")
+cinter=find_value("cinter")
+sinter=find_value("sinter")
 cli_mac_d=find_value("cli_mac_d")
 sour_start_ip=find_value("sour_start_ip")
 sour_ip_num=find_value("sour_ip_num")
@@ -87,7 +87,7 @@ def l2_send_pack(pcap_files):
         tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
         tcpprep_pipe.wait()
         if tcpprep_pipe.returncode==0 :
-            cmd="tcpreplay --cachefile="+cache+" --intf1="+eth0+" --intf2="+eth1+" "+repcap
+            cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
             print "start tcpreplay pcap:",repcap," waite..."
             tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
             tcpreplay_pipe.wait()
@@ -117,11 +117,12 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
     tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcpprep_pipe.wait()
     if tcpprep_pipe.returncode==0 :
-        cmd="tcprewrite --enet-dmac="+ser_mac_d+","+cli_mac_d+" --enet-smac="+ser_mac_s+","+cli_mac_s+" --endpoints="+dest_start_ip+":"+sour_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
+        cmd="tcprewrite --enet-dmac="+cli_mac_d+","+ser_mac_d+" --enet-smac="+cli_mac_s+","+ser_mac_s+" --endpoints="+sour_start_ip+":"+dest_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
+        # cmd="tcprewrite --enet-dmac="+ser_mac_d+","+cli_mac_d+" --enet-smac="+ser_mac_s+","+cli_mac_s+" --endpoints="+dest_start_ip+":"+sour_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
         tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
         tcprewrite_pipe.wait()
         if tcprewrite_pipe.returncode==0 :
-            cmd="tcpreplay --cachefile="+cache+" --intf1="+eth0+" --intf2="+eth1+" "+send_pcap
+            cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+send_pcap
             print "start tcpreplay pcap:",repcap," waite..."
             tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
             tcpreplay_pipe.wait()
