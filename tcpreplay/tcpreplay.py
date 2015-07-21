@@ -163,16 +163,10 @@ def l3_send_packs(pcap_files):
 
 
 
-if mode == "2":
-#    print "path:",get_file_path(path)
-    print "a"
-#    l2_send_pack(get_file_path(path))
-elif mode == "3":
-#    print "path:",get_file_path(path)
+if mode == int(2):
+    l2_send_pack(get_file_path(path))
+elif mode == int(3):
     l3_send_packs(get_file_path(path))
-#    a=get_ip("192.168.1.10",5000)
-
- #   print "a:",a
 else:
     print "replay.conf mode error"
     exit(255)
