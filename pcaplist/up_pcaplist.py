@@ -12,8 +12,26 @@ def get_file_path(pcap_path):
                 pcap_files.append(os.path.join(parent,filename))
     return pcap_files
 
+def cap_to_pcap(pcap_path):
+    pcap_files=[]
+    for parent,dirnames,filenames in os.walk(pcap_path):
+        for filename in filenames:
+            if None!=re.search("\.cap$",filename) :
+                pcap_files.append(os.path.join(parent,filename))
+    for i in range(len(pcap_files)):
+        p=re.compile("cap$")
+        pcap=p.sub('pcap',pcap_files[i])
+        cmd="tcpdump -r "+pcap_files[i]+" -w "+pcap
+        tcp_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        tcp_pipe.wait() 
+        if tcp_pipe.returncode != 0 :
+            print "packet:",pcap_files[i],"  cap to pcap fail!!!!!!!!\n"
+
+    
 
 path="pcaps"
+cap_to_pcap(path)
+
 pcaps_file='pcaps_list'
 update_file='pcap_num'
 f=open(pcaps_file,'r')
