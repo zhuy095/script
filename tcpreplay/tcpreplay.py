@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import os,commands,thread
-import subprocess
+import os,commands,threading
+import subprocess,time
 import re
 path="pcaps"
 f=open('replay.conf','r')
@@ -26,16 +26,22 @@ mode=find_value("mode")
 cinter=find_value("cinter")
 sinter=find_value("sinter")
 cli_mac_d=find_value("cli_mac_d")
-sour_start_ip=find_value("sour_start_ip")
-sour_ip_num=find_value("sour_ip_num")
-#sour_start_port=find_value("sour_start_port")
-#sour_port_num=find_value("sour_port_num")
+sour_start_ip=find_value("cli_start_ip")
+sour_ip_num=find_value("cli_ip_num")
 ser_mac_d=find_value("ser_mac_d")
-dest_start_ip=find_value("dest_start_ip")
-dest_ip_num=find_value("dest_ip_num")
-#dest_start_port=find_value("dest_start_port")
-#dest_port_num=find_value("dest_port_num")
+dest_start_ip=find_value("ser_start_ip")
+dest_ip_num=find_value("ser_ip_num")
+concurrent=find_value("concurrent")
 
+
+def thread_alive_num(threads):
+    num=[]
+    for i in range(len(threads)):
+        if threads[i].isAlive()!=True:
+            num.append(i)
+    for i in sorted(num,reverse=True):
+        del threads[i]
+    return len(threads)
 
 def get_ip(ip,num):
     ip_new_list=[]
@@ -77,33 +83,46 @@ def ip_to_mac(ip):
     return mac_new
 
 
-def l2_send_pack(pcap_files):
+def l2_send_pack(repcap):
+    p=re.compile("pcap$")
+    cache=p.sub('cache',repcap)
+    p=re.compile("pcap$")
+    send_pcap=p.sub('send',repcap)
+    cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
+    tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+    tcpprep_pipe.wait()
+    if tcpprep_pipe.returncode==0 :
+        cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
+        print "tcpreplay pcap:",repcap
+        tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        tcpreplay_pipe.wait()
+        if tcpreplay_pipe.returncode!=0:
+            print "packet: ",repcap," replay failed"
+            print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+            print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
+    else:
+        print "tcpprep error pcap:",repcap
+        print "tcpprep error info:",tcpprep_pipe.stderr.read()
+
+def l2_send_packs(pcap_files):
+    time_span=0.2
+    threads=[]
+    thread_num=0
     for repcap in pcap_files:
-        p=re.compile("pcap$")
-        cache=p.sub('cache',repcap)
-        p=re.compile("pcap$")
-        send_pcap=p.sub('send',repcap)
-        cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
-        tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-        tcpprep_pipe.wait()
-        if tcpprep_pipe.returncode==0 :
-            cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
-            print "start tcpreplay pcap:",repcap," waite..."
-            tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-            tcpreplay_pipe.wait()
-            if tcpreplay_pipe.returncode==0:
-                print "packet:",repcap," replay complete\n\n"
-            else:
-                print "packet: ",repcap," replay failed"
-                print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-                print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
-        else:
-            print "tcpprep error pcap:",repcap
-            print "tcpprep error info:",tcpprep_pipe.stderr.read()
-
-
-
-
+        thread=threading.Thread(target=l2_send_pack,args=(repcap,))
+        thread.setDaemon(True)
+        threads.append(thread)
+        thread.start()
+        thread_num+=1
+        while int(thread_num) >= int(concurrent):
+            time.sleep(time_span)
+            thread_num=len(threads)
+            thread_num=thread_alive_num(threads)
+    time.sleep(1)
+    print "\nwaiting for tcpreplay complite!!\n"
+    while int(thread_num) != int(0):
+        time.sleep(time_span)
+        thread_num=thread_alive_num(threads)
 
 
 def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,sour_start_ip):
@@ -111,24 +130,20 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
     cache=p.sub('cache',repcap)
     p=re.compile("pcap$")
     tmp=dest_start_ip+"_"+sour_start_ip
-#    send_pcap=p.sub('send',repcap)
     send_pcap=p.sub(tmp,repcap)
     cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
     tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcpprep_pipe.wait()
     if tcpprep_pipe.returncode==0 :
         cmd="tcprewrite --enet-dmac="+cli_mac_d+","+ser_mac_d+" --enet-smac="+cli_mac_s+","+ser_mac_s+" --endpoints="+sour_start_ip+":"+dest_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
-        # cmd="tcprewrite --enet-dmac="+ser_mac_d+","+cli_mac_d+" --enet-smac="+ser_mac_s+","+cli_mac_s+" --endpoints="+dest_start_ip+":"+sour_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
         tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
         tcprewrite_pipe.wait()
         if tcprewrite_pipe.returncode==0 :
             cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+send_pcap
-            print "start tcpreplay pcap:",repcap," waite..."
+            print "tcpreplay pcap:",repcap,"--cli_ip:",sour_start_ip,"--ser_ip:",dest_start_ip
             tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
             tcpreplay_pipe.wait()
-            if tcpreplay_pipe.returncode==0:
-                print "packet:",repcap," replay complete\n\n"
-            else:
+            if tcpreplay_pipe.returncode!=0:
                 print "packet: ",repcap," replay failed"
                 print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
                 print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
@@ -141,31 +156,20 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
 
 def l3_send_packs(pcap_files):
     s_ip=get_ip(sour_start_ip,sour_ip_num)
-    print "sour_ip",s_ip
     d_ip=get_ip(dest_start_ip,dest_ip_num)
-    print "dest_ip",d_ip
-    print "pcap_files:",pcap_files
     for pcap in pcap_files:
         for snum in range(int(sour_ip_num)):
             smac_c=ip_to_mac(s_ip[snum])
             for dnum in range(int(dest_ip_num)):
-               smac_s=ip_to_mac(d_ip[dnum])
-               print "pcap:",pcap
-               print "ser_mac_d",ser_mac_d
-               print "cli_mac_d",cli_mac_d
-               print "smac_s",smac_s
-               print "smac_c",smac_c
-               print "d_ip[",dnum,"] =",d_ip[dnum]
-               print "s_ip[",snum,"] =",s_ip[snum]
-              # thread.start_new_thread(l3_send_pack,(pcap,ser_mac_d,cli_mac_d,smac_s, smac_c,d_ip[dnum],s_ip[snum]))
-               
-               l3_send_pack(pcap,ser_mac_d,cli_mac_d,smac_s, smac_c,d_ip[dnum],s_ip[snum])
+                smac_s=ip_to_mac(d_ip[dnum])
+                thread_num=0
+                l3_send_pack(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum])
 
 
 
-if mode == int(2):
-    l2_send_pack(get_file_path(path))
-elif mode == int(3):
+if int(mode) == int(2):
+    l2_send_packs(get_file_path(path))
+elif int(mode) == int(3):
     l3_send_packs(get_file_path(path))
 else:
     print "replay.conf mode error"
