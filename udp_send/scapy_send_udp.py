@@ -25,8 +25,6 @@ def get_ip(ip,num):
     ip_new_list=[]
     ip_new_list.append(ip)
     ip_n=ip.split('.')
-    print "ip:",ip
-    print "ip_n:",ip_n
     for i in range(int(num)-1):
         tmp=ip_n[3]=int(ip_n[3])+1
         if tmp  > 254 :
@@ -46,7 +44,7 @@ def get_ip(ip,num):
 def get_port(port,num):
     ports=[]
     ports.append(port)
-    for i in range(int(num)-1):
+    for i in range(1,int(num),1):
         ports.append(int(port)+i)
     return ports
 
@@ -58,82 +56,91 @@ def get_send_data(length):
 
 
 def get_mac_address(eth):
-    cmd='ifconfig eth1  | grep HWaddr | awk \'{print $5}\''
+    cmd="ifconfig "+eth+"  | grep HWaddr | awk \'{print $5}\'"
     pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     pipe.wait()
-    return tcpreplay_pipe.stdout.read()
+    return pipe.stdout.read().replace('\n','')
+
+def get_send_value():
+    confs=get_file_value(conf)
+    src_eth=find_value("src_eth",confs)
+    src_ip=find_value("src_ip",confs)
+    srcip_num=find_value("srcip_num",confs)
+    src_port=find_value("src_port",confs)
+    srcport_num=find_value("srcport_num",confs)
+    src_dmac=find_value("src_dmac",confs)
+    dest_eth=find_value("dest_eth",confs)
+    dest_ip=find_value("dest_ip",confs)
+    destip_num=find_value("destip_num",confs)
+    dest_port=find_value("dest_port",confs)
+    destport_num=find_value("destport_num",confs)
+    dest_dmac=find_value("dest_dmac",confs)
+    mtu=find_value("mtu",confs)
+    load=get_send_data(mtu)
+
+    srcips=get_ip(src_ip,srcip_num)
+    destips=get_ip(dest_ip,destip_num)
+    srcports=get_port(src_port,srcport_num)
+    destports=get_port(dest_port,destport_num)
+    return srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load
 
 
-
-"""
-def get_mac_address(): 
-    mac=uuid.UUID(int = uuid.getnode()).hex[-12:] 
-    return ":".join([mac[e:e+2] for e in range(0,11,2)])
-
-"""
-
-
-
-confs=get_file_value(conf)
-print confs
-src_eth=find_value("src_eth",confs)
-src_ip=find_value("src_ip",confs)
-srcip_num=find_value("srcip_num",confs)
-src_port=find_value("src_port",confs)
-srcport_num=find_value("srcport_num",confs)
-dest_eth=find_value("dest_eth",confs)
-dest_ip=find_value("dest_ip",confs)
-destip_num=find_value("destip_num",confs)
-dest_port=find_value("dest_port",confs)
-destport_num=find_value("destport_num",confs)
-mtu=find_value("mtu",confs)
-
-load=get_send_data(mtu)
+def get_send_pcaps(srcips,destips,srcports,destports,smac,dmac,load):
+    print "\nprepare pcaps,please waiting..."
+    print "srcip:",srcips
+    print "destip:",destips
+    print "srcport:",srcports
+    print "destport:",destports
+    pcaps=[]
+    for srcip in srcips:
+        for destip in destips:
+            for srcport in srcports:
+                for destport in destports:
+                    srcport=int(srcport)
+                    destport=int(destport)
+                    pcaps.append(str(Ether(dst=dmac,src=smac)/IP(src=srcip,dst=destip)/UDP(sport=srcport,dport=destport)/load))
+    print "prepare pcaps complete!"
+    return pcaps
 
 
-print "mtu:",mtu
-print "srcip:",src_ip
-pcaps=[]
-srcips=get_ip(src_ip,srcip_num)
-destips=get_ip(dest_ip,destip_num)
-srcports=get_port(src_port,srcport_num)
-destports=get_port(dest_port,destport_num)
-print "srcip:",srcips
-print "destip:",destips
-print "srcport:",srcports
-print "destport:",destports
- 
-#for i in range(len(srcips)):
-#    for j in range(len(destips)):
-#        for x in range(len(srcports)):
-#            for y in range(len(destports)):
+def get_socket(eth):
+    s = socket.socket(socket.AF_PACKET,socket.SOCK_RAW,0x0800)
+    s.bind((eth,50007))
+    return s
 
-for srcip in srcips:
-    for destip in destips:
-        for srcport in srcports:
-            for destport in destports:
-                print "srcip:",srcip
-                print "destip:",destip
-                print "srcport:",srcport
-                print "destport:",destport
-                srcport=int(srcport)
-                destport=int(destport)
-                tmp=str(Ether(dst="aa:bb:cc:dd:ee:ff",src="aa:bb:cc:dd:ee:aa" )/IP(src=srcip,dst=destip)/UDP(sport=srcport,dport=destport)/load)
-                pcaps.append(tmp)
+def send_socket(sfile,pcaps):
+    while True:
+        for i in range(len(pcaps)):
+            sfile.send(pcaps[i])
 
-s = socket.socket(socket.AF_PACKET,socket.SOCK_RAW,0x0800)
-s.bind(('eth1',50007))
+    
+srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load=get_send_value()
 
-for i in range(len(pcaps)):
-    s.send(pcaps[i])
+src_smac=get_mac_address(src_eth)
+src_send_pcaps=get_send_pcaps(srcips,destips,srcports,destports,src_smac,src_dmac,load)
+
+dest_smac=get_mac_address(dest_eth)
+dest_send_pcaps=get_send_pcaps(destips,srcips,destports,srcports,dest_smac,dest_dmac,load)
 
 
-"""
-a=Ether(dst="aa:bb:cc:dd:ee:ff",src="aa:bb:cc:dd:ee:aa" )/IP(src="192.168.0.1",dst="192.168.0.1")/UDP(sport=1000,dport=1000)/"00000000000000000000"
+#sockets=[]
+#sockets.append(get_socket(src_eth)
+#sockets.append(get_socket(dest_eth)
 
-b=str(a)
-s = socket.socket(socket.AF_PACKET,socket.SOCK_RAW,0x0800)
-s.bind(('eth1', 50007))
-s.send(b)
-"""
+threads=[]
+t1=threading.Thread(target=send_socket,args=(get_socket(src_eth),src_send_pcaps,))
+threads.append(t1)
+t2=threading.Thread(target=send_socket,args=(get_socket(dest_eth),dest_send_pcaps,))
+threads.append(t2)
+
+
+if __name__=='__main__':
+    for t in threads:
+        t.setDaemon(True)
+        t.start()
+    for t in threads:
+        t.join()
+    print " all is over"
+
+
 
