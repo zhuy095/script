@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys,time,re,subprocess,os,threading,uuid
+import sys,time,re,subprocess,os,threading,uuid,signal
 from scapy.all import *
 
 conf='udp.conf'
@@ -108,39 +108,75 @@ def get_socket(eth):
     s.bind((eth,50007))
     return s
 
-def send_socket(sfile,pcaps):
-    while True:
-        for i in range(len(pcaps)):
-            sfile.send(pcaps[i])
+def send_socket(sfile,pcaps,tims):
+    if tims == 0:
+        while True:
+            for i in range(len(pcaps)):
+                sfile.send(pcaps[i])
+    else:
+        t=0
+        while t<tims:
+            for i in range(len(pcaps)):
+                sfile.send(pcaps[i])
+            t+=1
 
-    
+
+def get_arp_pcaps(ips,mac):
+    arppcaps=[]
+    for ip in ips:
+        arp=Ether(dst="ff:ff:ff:ff:ff:ff",src=mac,type=0x0806)/ARP(op=1,hwsrc=mac,psrc=ip,hwdst=mac,pdst=ip)
+        arppcaps.append(str(arp))
+    return arppcaps
+
+def send_arp(sfile,pcaps):
+    for i in range(len(pcaps)):
+        sfile.send(pcaps[i])
+    time.sleep(30)
+    send_arp(sfile,pcaps)
+
+def handler(threads):
+    for t in threads:
+        t.stop()
+    print "\n\nstop all......"
+
+ 
 srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load=get_send_value()
 
 src_smac=get_mac_address(src_eth)
 src_send_pcaps=get_send_pcaps(srcips,destips,srcports,destports,src_smac,src_dmac,load)
+src_arp_pcaps=get_arp_pcaps(srcips,src_smac)
 
 dest_smac=get_mac_address(dest_eth)
 dest_send_pcaps=get_send_pcaps(destips,srcips,destports,srcports,dest_smac,dest_dmac,load)
-
-
-#sockets=[]
-#sockets.append(get_socket(src_eth)
-#sockets.append(get_socket(dest_eth)
+dest_arp_pcaps=get_arp_pcaps(destips,dest_smac)
 
 threads=[]
-t1=threading.Thread(target=send_socket,args=(get_socket(src_eth),src_send_pcaps,))
+s_file=get_socket(src_eth)
+d_file=get_socket(dest_eth)
+
+t1=threading.Thread(target=send_arp,args=(s_file,src_arp_pcaps,))
 threads.append(t1)
-t2=threading.Thread(target=send_socket,args=(get_socket(dest_eth),dest_send_pcaps,))
+t2=threading.Thread(target=send_arp,args=(d_file,dest_arp_pcaps,))
 threads.append(t2)
+t3=threading.Thread(target=send_socket,args=(s_file,src_send_pcaps,0,))
+threads.append(t3)
+t4=threading.Thread(target=send_socket,args=(d_file,dest_send_pcaps,0,))
+threads.append(t4)
 
 
-if __name__=='__main__':
+for t in threads:
+    t.setDaemon(True)
+    t.start()
+#for t in threads:
+#    t.join()
+
+signal.signal(signal.SIGINT, handler(threads))
+
+if threads[2].isAlive() or threads[3].isAlive() :
     for t in threads:
-        t.setDaemon(True)
-        t.start()
-    for t in threads:
-        t.join()
-    print " all is over"
+        t.stop()
+   
+print " all is over"
 
 
 
