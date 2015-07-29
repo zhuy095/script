@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-import sys,time,re,subprocess,os,threading,uuid,signal
+import sys,time,re,subprocess,os,threading,uuid,signal,Queue
 from scapy.all import *
 
 conf='udp.conf'
-
+isStop=0
 def get_file_value(conf):
     new_conf=[]
     f=open(conf,'r')
@@ -76,13 +76,13 @@ def get_send_value():
     destport_num=find_value("destport_num",confs)
     dest_dmac=find_value("dest_dmac",confs)
     mtu=find_value("mtu",confs)
+    run_time=find_value("run_time",confs)
     load=get_send_data(mtu)
-
     srcips=get_ip(src_ip,srcip_num)
     destips=get_ip(dest_ip,destip_num)
     srcports=get_port(src_port,srcport_num)
     destports=get_port(dest_port,destport_num)
-    return srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load
+    return srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load,run_time
 
 
 def get_send_pcaps(srcips,destips,srcports,destports,smac,dmac,load):
@@ -111,20 +111,27 @@ def get_socket(eth):
 def send_socket(sfile,pcaps,tims):
     if tims == 0:
         while True:
+#            print "que.empty1:",que.empty()
             for i in range(len(pcaps)):
                 sfile.send(pcaps[i])
+#            print "que.empty2:",que.empty()
+            if que.empty()==False:
+                break
     else:
         t=0
         while t<tims:
             for i in range(len(pcaps)):
                 sfile.send(pcaps[i])
             t+=1
+            print "que.empty:",que.empty()
+            if que.empty()==False:
+                break
 
 
 def get_arp_pcaps(ips,mac):
     arppcaps=[]
     for ip in ips:
-        arp=Ether(dst="ff:ff:ff:ff:ff:ff",src=mac,type=0x0806)/ARP(op=1,hwsrc=mac,psrc=ip,hwdst=mac,pdst=ip)
+        arp=Ether(dst="ff:ff:ff:ff:ff:ff",src=mac,type=0x0806)/ARP(op=1,hwsrc=mac,psrc=ip,hwdst="00:00:00:00:00:00",pdst=ip)
         arppcaps.append(str(arp))
     return arppcaps
 
@@ -132,15 +139,22 @@ def send_arp(sfile,pcaps):
     for i in range(len(pcaps)):
         sfile.send(pcaps[i])
     time.sleep(30)
-    send_arp(sfile,pcaps)
+    if que.empty()==False:
+        send_arp(sfile.pcaps)
 
-def handler(threads):
-    for t in threads:
-        t.stop()
+def handler(signum,frame):
+    que.put("stop")
+    time.sleep(2)
+    print "please wait for stop send pcaps"
     print "\n\nstop all......"
 
- 
-srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load=get_send_value()
+que=Queue.Queue(10) 
+signal.signal(signal.SIGINT, handler)
+signal.signal(signal.SIGHUP, handler)
+signal.signal(signal.SIGTERM, handler)
+
+
+srcips,destips,srcports,destports,src_dmac,dest_dmac,src_eth,dest_eth,load,run_time=get_send_value()
 
 src_smac=get_mac_address(src_eth)
 src_send_pcaps=get_send_pcaps(srcips,destips,srcports,destports,src_smac,src_dmac,load)
@@ -165,18 +179,7 @@ threads.append(t4)
 
 
 for t in threads:
-    t.setDaemon(True)
+    t.setDaemon(False)
+#    t.setDaemon(True)
     t.start()
-#for t in threads:
 #    t.join()
-
-signal.signal(signal.SIGINT, handler(threads))
-
-if threads[2].isAlive() or threads[3].isAlive() :
-    for t in threads:
-        t.stop()
-   
-print " all is over"
-
-
-
