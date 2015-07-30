@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys,time,re,subprocess,os,multiprocessing,uuid,signal,Queue
+import sys,time,re,subprocess,os,multiprocessing,uuid,signal
 from scapy.all import *
 
 conf='udp.conf'
@@ -112,20 +112,13 @@ def send_socket(sfile,pcaps,tims):
         while True:
             for i in range(len(pcaps)):
                 sfile.send(pcaps[i])
-            if que.empty()==False:
-                sfile.close()
-                break
     else:
         t=0
         while t<tims:
             for i in range(len(pcaps)):
                 sfile.send(pcaps[i])
             t+=1
-            if que.empty()==False:
-                sfile.close()
-                break
-
-
+ 
 def get_arp_pcaps(ips,mac):
     arppcaps=[]
     for ip in ips:
@@ -141,17 +134,21 @@ def send_arp(sfile,pcaps):
         send_arp(sfile,pcaps)
 
 def handler(signum,frame):
-    que.put("stop")
+    for i in pro:
+        i.terminate()
+    s_file.close()
+    d_file.close()
     cmd='echo 1 > /proc/sys/vm/drop_caches'
     cleanmem_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     cleanmem_pipe.wait()
     time.sleep(1)
-    print("please wait for stop send pcaps")
-    print("\n\nstop all......")
+    print("\nstop all......")
+
 
 
 try:
-    que=Queue.Queue(10) 
+    global pro,s_file,d_file
+    pro=[]
     signal.signal(signal.SIGINT, handler)
 #    signal.signal(signal.SIGHUP, handler)
 #    signal.signal(signal.SIGTERM, handler)
@@ -165,7 +162,6 @@ try:
     dest_send_pcaps=get_send_pcaps(destips,srcips,destports,srcports,dest_smac,dest_dmac,load)
     dest_arp_pcaps=get_arp_pcaps(destips,dest_smac)
 
-    pro=[]
     s_file=get_socket(src_eth)
     d_file=get_socket(dest_eth)
     
@@ -178,13 +174,6 @@ try:
     pro.append(t)
     t=multiprocessing.Process(target=send_socket,args=(s_file,src_send_pcaps,int(run_time),))
     pro.append(t)
-#    for i in range(multiprocessing.cpu_count()):
-#        if int(i)%2 == 0 :
-#            t=multiprocessing.Process(target=send_socket,args=(src_eth,src_send_pcaps,int(run_time),))
-#        else:
-#            t=multiprocessing.Process(target=send_socket,args=(dest_eth,src_send_pcaps,int(run_time),))
-#        pro.append(t)
-    
     
     for t in pro:
         t.daemon=False
