@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os,commands,threading,multiprocessing
+import os,commands,signal,multiprocessing
 import subprocess,time
 import re
 path="pcaps"
@@ -65,7 +65,6 @@ def get_ip(ip,num):
 
 
 def get_file_path(pcap_path):
-# pcap_path="pcaps"
     pcap_files=[]
     for parent,dirnames,filenames in os.walk(pcap_path):
         for filename in filenames: 
@@ -105,24 +104,14 @@ def l2_send_pack(repcap):
         print "tcpprep error info:",tcpprep_pipe.stderr.read()
 
 def l2_send_packs(pcap_files):
-    time_span=0.2
-    threads=[]
-    thread_num=0
+    global pool
+    pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
     for repcap in pcap_files:
-        thread=threading.Thread(target=l2_send_pack,args=(repcap,))
-        thread.setDaemon(True)
-        threads.append(thread)
-        thread.start()
-        thread_num+=1
-        while int(thread_num) >= int(concurrent):
-            time.sleep(time_span)
-            thread_num=len(threads)
-            thread_num=thread_alive_num(threads)
-    time.sleep(1)
+        #thread=threading.Thread(target=l2_send_pack,args=(repcap,))
+        pool.apply_async(l2_send_pack,(repcap,))
+    pool.close()
+    pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
-    while int(thread_num) != int(0):
-        time.sleep(time_span)
-        thread_num=thread_alive_num(threads)
 
 
 def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,sour_start_ip):
@@ -155,21 +144,28 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
         print "tcpprep error info:",tcpprep_pipe.stderr.read()    
 
 def l3_send_packs(pcap_files):
-    pro=[]
     s_ip=get_ip(sour_start_ip,sour_ip_num)
     d_ip=get_ip(dest_start_ip,dest_ip_num)
+    global pool
     pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
     for pcap in pcap_files:
         for snum in range(int(sour_ip_num)):
             smac_c=ip_to_mac(s_ip[snum])
             for dnum in range(int(dest_ip_num)):
                 smac_s=ip_to_mac(d_ip[dnum])
-                #thread=threading.Thread(target=l3_send_pack,args=(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
-                pool.apply_async(target=l3_send_pack,args=(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
+                pool.apply_async(l3_send_pack,(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
     pool.close()
     pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
 
+def handler(signum,frame):
+    pool.terminate()
+    print "closed tcprelay!"
+
+
+signal.signal(signal.SIGINT, handler)
+signal.signal(signal.SIGHUP, handler)
+signal.signal(signal.SIGTERM, handler)
 
 
 if int(mode) == int(2):
