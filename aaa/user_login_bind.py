@@ -83,7 +83,7 @@ def user_login(localip,key):
     http=httpers.read()
     if None != re.search("true",http):
         print("%s login success"%localip)
-    elif None != re.search("false",http):
+    else:
         print("%s login fail"%locaoip)
 #    print("%s login result:%s"%(localip,urllib.quote(http)))
 #    print("%s login result:%s"%(localip,http))
@@ -104,8 +104,9 @@ def handler(signum,frame):
     print "stop login!"
 
 start_ip='192.168.222.1'
+ip_num=100
 key='2wa'
-process_num=190
+process_num=1
 eth='eth1'
 netmask='/16'
 
@@ -116,7 +117,7 @@ signal.signal(signal.SIGTERM, handler)
 global pool,login_num
 pool=multiprocessing.Pool(processes=process_num)
 #login_num=0
-ipg=get_ip(start_ip,100,eth,netmask)
+ipg=get_ip(start_ip,ip_num,eth,netmask)
 for i in range(len(ipg)):
    pool.apply_async(user_login,(ipg[i],key,))
 pool.close()
