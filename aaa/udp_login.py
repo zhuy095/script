@@ -147,10 +147,10 @@ def rev_pcap(s):
 AcIp='192.168.1.19'
 AuthIp='192.168.80.1'
 ip_nums=30000
-key='p23'
+key='3dk'
 sNo='200'
 isfor=1
-speed=200
+speed=400
 localhost=('192.168.2.104',50100)
 
 
