@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os,commands,threading
+import os,commands,multiprocessing
 import subprocess,time
 import re
 path="pcaps"
@@ -8,11 +8,9 @@ f=open('replay.conf','r')
 conf=f.readlines()
 f.close()
 
-
 new_conf=[]
 for i in range(len(conf)):
     if None!=re.match('.*=.*',conf[i]):
-        #new_conf[j]=conf[i]
         new_conf.append(conf[i])
 
 def find_value(key):
@@ -32,7 +30,6 @@ ser_mac_d=find_value("ser_mac_d")
 dest_start_ip=find_value("ser_start_ip")
 dest_ip_num=find_value("ser_ip_num")
 concurrent=find_value("concurrent")
-
 
 def thread_alive_num(threads):
     num=[]
@@ -65,7 +62,6 @@ def get_ip(ip,num):
 
 
 def get_file_path(pcap_path):
-# pcap_path="pcaps"
     pcap_files=[]
     for parent,dirnames,filenames in os.walk(pcap_path):
         for filename in filenames: 
@@ -155,31 +151,18 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
         print "tcpprep error info:",tcpprep_pipe.stderr.read()    
 
 def l3_send_packs(pcap_files):
-    time_span=0.2
-    threads=[]
-    thread_num=0
     s_ip=get_ip(sour_start_ip,sour_ip_num)
     d_ip=get_ip(dest_start_ip,dest_ip_num)
+    pool=multiprocessing.Pool(int(concurrent))
     for pcap in pcap_files:
         for snum in range(int(sour_ip_num)):
             smac_c=ip_to_mac(s_ip[snum])
             for dnum in range(int(dest_ip_num)):
                 smac_s=ip_to_mac(d_ip[dnum])
-                thread=threading.Thread(target=l3_send_pack,args=(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
-                thread.setDaemon(True)
-                threads.append(thread)
-                thread.start()
-                thread_num+=1
-                while int(thread_num) >= int(concurrent):
-                    time.sleep(time_span)
-                    thread_num=len(threads)
-                    thread_num=thread_alive_num(threads)
-    time.sleep(1)
+                pool.apply_async(l3_send_pack,args=(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
+    pool.close()
+    pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
-    while int(thread_num) != int(0):
-        time.sleep(time_span)
-        thread_num=thread_alive_num(threads)
-#                l3_send_pack(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum])
 
 if int(mode) == int(2):
     l2_send_packs(get_file_path(path))
@@ -188,4 +171,3 @@ elif int(mode) == int(3):
 else:
     print "replay.conf mode error"
     exit(255)
-
