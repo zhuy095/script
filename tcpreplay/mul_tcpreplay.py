@@ -32,16 +32,7 @@ ser_mac_d=find_value("ser_mac_d")
 dest_start_ip=find_value("ser_start_ip")
 dest_ip_num=find_value("ser_ip_num")
 concurrent=find_value("concurrent")
-
-
-def thread_alive_num(threads):
-    num=[]
-    for i in range(len(threads)):
-        if threads[i].isAlive()!=True:
-            num.append(i)
-    for i in sorted(num,reverse=True):
-        del threads[i]
-    return len(threads)
+loop_num=find_value("loop_num")
 
 def get_ip(ip,num):
     ip_new_list=[]
@@ -87,28 +78,28 @@ def l2_send_pack(repcap):
     cache=p.sub('cache',repcap)
     p=re.compile("pcap$")
     send_pcap=p.sub('send',repcap)
-    cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
-    tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-    tcpprep_pipe.wait()
-    if tcpprep_pipe.returncode==0 :
-        cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
-        print "tcpreplay pcap:",repcap
-        tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-        tcpreplay_pipe.wait()
-        if tcpreplay_pipe.returncode!=0:
-            print "packet: ",repcap," replay failed"
-            print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-            print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
-    else:
-        print "tcpprep error pcap:",repcap
-        print "tcpprep error info:",tcpprep_pipe.stderr.read()
+    if os.path.isfile(cache) != True:
+        cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
+        tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        tcpprep_pipe.wait()
+        if tcpprep_pipe.returncode !=0 :
+            print "tcpprep error pcap:",repcap
+            print "tcpprep error info:",tcpprep_pipe.stderr.read()
+    cmd="tcpreplay -t --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
+    print "tcpreplay pcap:",repcap
+    tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+    tcpreplay_pipe.wait()
+    if tcpreplay_pipe.returncode!=0:
+        print "packet: ",repcap," replay failed"
+        print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+        print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
 
 def l2_send_packs(pcap_files):
     global pool
     pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for repcap in pcap_files:
-        #thread=threading.Thread(target=l2_send_pack,args=(repcap,))
-        pool.apply_async(l2_send_pack,(repcap,))
+    for loop_n in range(loop_num):
+        for repcap in pcap_files:
+            pool.apply_async(l2_send_pack,(repcap,))
     pool.close()
     pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
@@ -120,40 +111,44 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
     p=re.compile("pcap$")
     tmp=dest_start_ip+"_"+sour_start_ip
     send_pcap=p.sub(tmp,repcap)
-    cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
-    tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-    tcpprep_pipe.wait()
-    if tcpprep_pipe.returncode==0 :
+    if os.path.isfile(cache) != True :
+        cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
+        tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+        tcpprep_pipe.wait()
+        if tcpprep_pipe.returncode ==0 :
+            print "tcpprep error pcap:",repcap
+            print "tcpprep error info:",tcpprep_pipe.stderr.read() 
+    if os.path.isfile(send_pcap) != True:
         cmd="tcprewrite --enet-dmac="+cli_mac_d+","+ser_mac_d+" --enet-smac="+cli_mac_s+","+ser_mac_s+" --endpoints="+sour_start_ip+":"+dest_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
         tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
         tcprewrite_pipe.wait()
-        if tcprewrite_pipe.returncode==0 :
-            cmd="tcpreplay --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+send_pcap
-            print "tcpreplay pcap:",repcap,"--cli_ip:",sour_start_ip,"--ser_ip:",dest_start_ip
-            tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-            tcpreplay_pipe.wait()
-            if tcpreplay_pipe.returncode!=0:
-                print "packet: ",repcap," replay failed"
-                print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-                print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
-        else:
+        if tcprewrite_pipe.returncode !=0 :
             print "tcprewrite error pcap:",repcap
-            print "tcprewrite error info:",tcprewrite_pipe.stderr.read()
+            print "tcprewrite error info:",tcprewrite_pipe.stderr.read()    
+    cmd="tcpreplay -t --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+send_pcap
+    print "tcpreplay pcap:",repcap,"--cli_ip:",sour_start_ip,"--ser_ip:",dest_start_ip
+    tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+    tcpreplay_pipe.wait()
+    if tcpreplay_pipe.returncode!=0:
+        print "packet: ",repcap," replay failed"
+        print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+        print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
     else:
-        print "tcpprep error pcap:",repcap
-        print "tcpprep error info:",tcpprep_pipe.stderr.read()    
+        print "tcprewrite error pcap:",repcap
+        print "tcprewrite error info:",tcprewrite_pipe.stderr.read()
 
 def l3_send_packs(pcap_files):
     s_ip=get_ip(sour_start_ip,sour_ip_num)
     d_ip=get_ip(dest_start_ip,dest_ip_num)
     global pool
     pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for pcap in pcap_files:
-        for snum in range(int(sour_ip_num)):
-            smac_c=ip_to_mac(s_ip[snum])
-            for dnum in range(int(dest_ip_num)):
-                smac_s=ip_to_mac(d_ip[dnum])
-                pool.apply_async(l3_send_pack,(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
+    for loop_n in range(loop_num):
+        for pcap in pcap_files:
+            for snum in range(int(sour_ip_num)):
+                smac_c=ip_to_mac(s_ip[snum])
+                for dnum in range(int(dest_ip_num)):
+                    smac_s=ip_to_mac(d_ip[dnum])
+                    pool.apply_async(l3_send_pack,(pcap,ser_mac_d,cli_mac_d,smac_s,smac_c,d_ip[dnum],s_ip[snum],))
     pool.close()
     pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
