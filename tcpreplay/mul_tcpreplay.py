@@ -97,7 +97,7 @@ def l2_send_pack(repcap):
 def l2_send_packs(pcap_files):
     global pool
     pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for loop_n in range(loop_num):
+    for loop_n in range(int(loop_num)):
         for repcap in pcap_files:
             pool.apply_async(l2_send_pack,(repcap,))
     pool.close()
@@ -142,7 +142,7 @@ def l3_send_packs(pcap_files):
     d_ip=get_ip(dest_start_ip,dest_ip_num)
     global pool
     pool=multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    for loop_n in range(loop_num):
+    for loop_n in range(int(loop_num)):
         for pcap in pcap_files:
             for snum in range(int(sour_ip_num)):
                 smac_c=ip_to_mac(s_ip[snum])
