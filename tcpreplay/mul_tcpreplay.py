@@ -8,7 +8,6 @@ f=open('replay.conf','r')
 conf=f.readlines()
 f.close()
 
-
 new_conf=[]
 for i in range(len(conf)):
     if None!=re.match('.*=.*',conf[i]):
@@ -54,7 +53,6 @@ def get_ip(ip,num):
         ip_new_list.append(str(ip_n[0])+"."+str(ip_n[1])+"."+str(ip_n[2])+"."+str(ip_n[3]))
     return ip_new_list
 
-
 def get_file_path(pcap_path):
     pcap_files=[]
     for parent,dirnames,filenames in os.walk(pcap_path):
@@ -72,20 +70,19 @@ def ip_to_mac(ip):
     mac_new="02:02:"+str(mac_old[0])+":"+str(mac_old[1])+":"+str(mac_old[2])+":"+str(mac_old[3])
     return mac_new
 
+def distinguish_pcap(repcap,cache):
+    cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
+    print("%s"%cmd)
+    tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+    tcpprep_pipe.wait()
+    if tcpprep_pipe.returncode !=0 :
+        print "tcpprep error pcap:",repcap
+        print "tcpprep error info:",tcpprep_pipe.stderr.read()
+    tcpprep_pipe.terminate()
 
-def l2_send_pack(repcap):
-    p=re.compile("pcap$")
-    cache=p.sub('cache',repcap)
-    p=re.compile("pcap$")
-    send_pcap=p.sub('send',repcap)
-    if os.path.isfile(cache) != True:
-        cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
-        tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-        tcpprep_pipe.wait()
-        if tcpprep_pipe.returncode !=0 :
-            print "tcpprep error pcap:",repcap
-            print "tcpprep error info:",tcpprep_pipe.stderr.read()
+def sendto_pcap(cache,cinter,sinter,repcap):
     cmd="tcpreplay -t --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+repcap
+    print("%s"%cmd)
     print "tcpreplay pcap:",repcap
     tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcpreplay_pipe.wait()
@@ -93,6 +90,26 @@ def l2_send_pack(repcap):
         print "packet: ",repcap," replay failed"
         print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
         print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
+    tcpreplay_pipe.terminate()
+
+def modify_pcap(cli_mac_d,ser_mac_d,cli_mac_s,ser_mac_s,sour_start_ip,dest_start_ip,cache,repcap,send_pcap):
+    cmd="tcprewrite --enet-dmac="+cli_mac_d+","+ser_mac_d+" --enet-smac="+cli_mac_s+","+ser_mac_s+" --endpoints="+sour_start_ip+":"+dest_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
+    print("%s"%cmd)
+    tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
+    tcprewrite_pipe.wait()
+    if tcprewrite_pipe.returncode !=0 :
+        print "tcprewrite error pcap:",repcap
+        print "tcprewrite error info:",tcprewrite_pipe.stderr.read() 
+    tcprewrite_pipe.terminate()
+
+def l2_send_pack(repcap):
+    p=re.compile("pcap$")
+    cache=p.sub('cache',repcap)
+    p=re.compile("pcap$")
+    send_pcap=p.sub('send',repcap)
+    if os.path.isfile(cache) != True:
+        distinguish_pcap(repcap,cache)
+    sendto_pcap(cache,cinter,sinter,repcap)
 
 def l2_send_packs(pcap_files):
     global pool
@@ -112,30 +129,10 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
     tmp=dest_start_ip+"_"+sour_start_ip
     send_pcap=p.sub(tmp,repcap)
     if os.path.isfile(cache) != True :
-        cmd="tcpprep --auto=client --pcap="+repcap+" --cachefile="+cache
-        tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-        tcpprep_pipe.wait()
-        if tcpprep_pipe.returncode ==0 :
-            print "tcpprep error pcap:",repcap
-            print "tcpprep error info:",tcpprep_pipe.stderr.read() 
+        distinguish_pcap(repcap,cache)
     if os.path.isfile(send_pcap) != True:
-        cmd="tcprewrite --enet-dmac="+cli_mac_d+","+ser_mac_d+" --enet-smac="+cli_mac_s+","+ser_mac_s+" --endpoints="+sour_start_ip+":"+dest_start_ip+" --skipbroadcast  --cachefile="+cache+" --infile="+repcap+" --outfile="+send_pcap
-        tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-        tcprewrite_pipe.wait()
-        if tcprewrite_pipe.returncode !=0 :
-            print "tcprewrite error pcap:",repcap
-            print "tcprewrite error info:",tcprewrite_pipe.stderr.read()    
-    cmd="tcpreplay -t --cachefile="+cache+" --intf1="+cinter+" --intf2="+sinter+" "+send_pcap
-    print "tcpreplay pcap:",repcap,"--cli_ip:",sour_start_ip,"--ser_ip:",dest_start_ip
-    tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
-    tcpreplay_pipe.wait()
-    if tcpreplay_pipe.returncode!=0:
-        print "packet: ",repcap," replay failed"
-        print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-        print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
-    else:
-        print "tcprewrite error pcap:",repcap
-        print "tcprewrite error info:",tcprewrite_pipe.stderr.read()
+        modify_pcap(cli_mac_d,ser_mac_d,cli_mac_s,ser_mac_s,sour_start_ip,dest_start_ip,cache,repcap,send_pcap)
+    sendto_pcap(cache,cinter,sinter,send_pcap)
 
 def l3_send_packs(pcap_files):
     s_ip=get_ip(sour_start_ip,sour_ip_num)
@@ -156,7 +153,6 @@ def l3_send_packs(pcap_files):
 def handler(signum,frame):
     pool.terminate()
     print "closed tcprelay!"
-
 
 signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGHUP, handler)
