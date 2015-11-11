@@ -1,0 +1,73 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+关键字描述
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;description testabc;end;show keyword key1    1    Description.*testabc    #添加key
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any key1 permit information always enable;end;show web-policy    1    rule.*key1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Sleep    1
+    ...    AND    Telnet Run    ${dut1}    conf t;no keyword key1    1
+
+关键字描述空
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;end;show keyword    1    key1    #添加key
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any key1 permit information always enable;end;show web-policy    1    rule.*key1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Sleep    1
+    ...    AND    Telnet Run    ${dut1}    conf t;no keyword key1    1
+
+关键字描述超128
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;description abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm;end;show keyword key1    0    #添加key    #添加key
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;description abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkl;end;show keyword key1    1    Description.*abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijkl    #添加key
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any key1 permit information always enable;end;show web-policy    1    rule.*key1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Sleep    1
+    ...    AND    Telnet Run    ${dut1}    conf t;no keyword key1
+
+修改网页关键字描述
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;description testabc;end;show keyword key1    1    Description.*testabc    #添加key描述
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any key1 permit information always enable;end;show web-policy    1    rule.*key1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80    #查找数据库
+    Telnet Run    ${dut1}    conf t; keyword key1;content test;description abctest;end;show keyword key1    1    Description.*abctest    #修改key描述
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    (.*172.16.1.100:80.*){2}    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Sleep    1
+    ...    AND    Telnet Run    ${dut1}    conf t;no keyword key1

@@ -1,0 +1,15 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+前置条件
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;vlan 10;exit;interface ge0/0;untag vlan 10;allow all;exit;interface ge0/1;untag vlan 10;allow all; end; show interface;    1
+    Telnet Run    ${dut1}    conf t; log instant-message memory upto informational;log search-engine memory upto informational;log social-network memory upto informational; log email memory upto informational;log file-transfer memory upto informational;log online-shopping memory upto informational;log app-others memory upto informational;log web-access memory upto informational
+    Telnet Run    ${dut1}    conf t;policy 1 any any any any any any any always permit;enable
+    Remote Run keyword    ${server_uri}    http_serv
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0
+    Remote Run keyword    ${client_uri}    win_gw_add    test    172.16.1.1
+    Remote Run keyword    ${server_uri}    win_set_static_ip    test    172.16.1.100    255.255.255.0
+    Remote Run keyword    ${server_uri}    win_gw_add    test    172.16.1.1
+    Telnet Run    ${dut1}    conf t;audit-log interval 1;end;show audit-log interval    1    1

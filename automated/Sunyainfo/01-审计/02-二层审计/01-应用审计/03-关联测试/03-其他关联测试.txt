@@ -1,0 +1,23 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+白名单关联测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;exit ; address addressa;host-address 172.16.1.10    #配置用户对象和地址对象
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    #配置策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;app-policy white-list usera addressa;end; show app-policy white-list    1    usera.*addressa    #配置白名单
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.10.*test1.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;no app-policy white-list usera addressa;end; show app-policy white-list    0    usera.*addressa    #删除白名单
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test2.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*test2.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no app-policy white-list usera addressa ;no audit-policy 1
+    ...    AND    Sleep    2
+    ...    AND    Telnet Run    ${dut1}    conf t; no \ user-local usera ; no address addressa    1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer

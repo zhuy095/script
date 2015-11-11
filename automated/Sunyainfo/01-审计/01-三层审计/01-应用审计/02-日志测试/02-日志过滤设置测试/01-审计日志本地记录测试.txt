@@ -1,0 +1,56 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+所有应用审计级别为信息测试
+    [Tags]    pass
+    #查看下当前日志级别；使用email验证功能
+    Telnet Run    ${dut1}    show log-config    1    instant-message.*informational
+    Telnet Run    ${dut1}    show log-config    1    search-engine.*informational
+    Telnet Run    ${dut1}    show log-config    1    social-network.*informational
+    Telnet Run    ${dut1}    show log-config    1    instant-message.*informational
+    Telnet Run    ${dut1}    show log-config    1    email.*informational
+    Telnet Run    ${dut1}    show log-config    1    file-transfer.*informational
+    Telnet Run    ${dut1}    show log-config    1    online-shopping.*informational
+    Telnet Run    ${dut1}    show log-config    1    app-others.*informational
+    Telnet Run    ${dut1}    conf t; audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*enable
+    Remote Run Keyword    ${client_uri}    stmp_send_text    test2@sunyatest.com    test    test    172.16.1.100
+    ...    test1    123456    sunyatest.com    uft-8    #1
+    Remote Run Keyword    ${client_uri}    pop3_resv    172.16.1.100    test2    123456    1
+    sleep    2
+    Audit Mysql Search    ${dut1}    email    1    POP3    #查找数据库
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    email
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1
+
+所有应用审计级别为通知测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*enable
+    Remote Run Keyword    ${client_uri}    stmp_send_text    test2@sunyatest.com    测试    test    172.16.1.100
+    ...    test1    123456    sunyatest.com    gb2312
+    Remote Run Keyword    ${client_uri}    pop3_resv    172.16.1.100    test2    123456    1
+    sleep    2
+    Audit Mysql Search    ${dut1}    email    1    POP3    #查找数据库
+    Audit Mysql Table Clear    ${dut1}    email
+    Telnet Run    ${dut1}    conf t; log instant-message memory upto notifications;log search-engine memory upto notifications;log social-network memory upto notifications; log email memory upto notifications;log file-transfer memory upto notifications;log online-shopping memory upto notifications;log app-others memory upto notifications; end; show log-config    1    (.*notifications.*[\r|\n]){7}
+    Remote Run Keyword    ${client_uri}    stmp_send_text    test2@sunyatest.com    测试    test    172.16.1.100
+    ...    test1    123456    sunyatest.com    gb2312    #发邮件
+    Remote Run Keyword    ${client_uri}    pop3_resv    172.16.1.100    test2    123456    1
+    ...    #收邮件并删除服务器的邮件
+    sleep    2    #等2s，写数据
+    Audit Mysql Search    ${dut1}    email    0    POP3    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1 ; log instant-message memory upto informational;log search-engine memory upto informational;log social-network memory upto informational; log email memory upto informational;log file-transfer memory upto informational;log online-shopping memory upto informational;log app-others memory upto informational
+    ...    AND    Audit Mysql Table Clear    ${dut1}    email
+
+部分应用被审计测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-policy 1 any any enable;audit instant-message;audit email;audit social-network;audit other;end; show audit-policy    0    file-transfer
+    Remote Run Keyword    ${client_uri}    stmp_send_text    test2@sunyatest.com    测试    test    172.16.1.100
+    ...    test1    123456    sunyatest.com    gb2312
+    Remote Run Keyword    ${client_uri}    pop3_resv    172.16.1.100    test2    123456    1
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    email    1    POP3
+    Audit Mysql Search    ${dut1}    file_transfer    0    test.iso
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    email
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1

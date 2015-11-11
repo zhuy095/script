@@ -1,0 +1,126 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+引用不存在的地址对象
+    [Tags]    pass
+    Telnet Run    ${dut1}    show address    0    test    #显示当前设备中无地址对象test
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any test enable    0    \    #引用不存在的用户test失败
+    [Teardown]    Run Keyword    Telnet Run    ${dut1}    conf t; no audit-policy 1
+
+引用地址对象为空测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa    #添加地址对象addressa，无成员
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressa.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.10    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address addressa
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+
+修改地址对象组为地址对象
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.10;exit;address addressb;host-address 172.16.1.101;exit;address-group addressgroup ;address-object addressa;address-object addressb    #添加地址对象addressa，无成员
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressgroup enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressgroup.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test2.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test2.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.101.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;end;show audit-policy    1    audit-policy 1.*addressa.* enable    #修改审计规则，
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test1.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.101.*test1.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address-group addressgroup
+    ...    AND    Sleep    1
+    ...    AND    Telnet Run    ${dut1}    conf t; no address addressa; no address addressb    1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+
+修改地址对象为其他地址对象
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.10;exit;address addressb;host-address 172.16.1.101    #添加地址对象addressa，无成员
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressa.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.101.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressb enable;end;show audit-policy    1    audit-policy 1.*addressb.* enable    #修改审计规则，
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test2.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.10.*test2.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.101.*172.16.1.100.*21.*FTP.*anonymous.*test1.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address addressa; no address addressb    1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+
+修改地址对象为自己
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.10;exit;address addressb;host-address 172.16.1.101    #添加地址对象addressa，无成员
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressa.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.101.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;end;show audit-policy    1    audit-policy 1.*addressa.* enable    #修改审计规则，
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test1.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.101*test1.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address addressa; no address addressb    1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+
+引用地址对象测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.10;end;show address    1    addressa    #添加地址对象addressa，无成员
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressa.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.101.*test.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address addressa
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+
+地址对象只匹配源地址
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.100    #添加地址对象addressa，成员为server地址
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any addressa enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1.*addressa.* enable    #添加审计规则，引用地址对象addressa
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    0    172.16.1.10.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;address addressa;host-address 172.16.1.10    #成员为client地址
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #usera使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*test.iso    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t;no audit-policy 1; no address addressa    1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    file_transfer

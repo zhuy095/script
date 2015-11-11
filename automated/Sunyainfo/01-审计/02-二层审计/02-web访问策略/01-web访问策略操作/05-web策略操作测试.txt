@@ -1,0 +1,17 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+策略单删测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;web-policy forbidden-page enable;end;show web-policy forbidden-page     1    enable    #启用阻断提示页面
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any deny information always enable;exit;    1    web-policy 1    #配置阻断策略
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    请与网络管理员联系    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access

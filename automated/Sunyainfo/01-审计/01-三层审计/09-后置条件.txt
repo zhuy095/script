@@ -1,0 +1,15 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+后置条件
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;interface ge0/0;no ip address 172.16.0.1/24;exit;interface ge0/1;no ip address 172.16.1.1/24; end; show interface;    0    ge0/0.*172.16.0.1(.*\n.*)ge0/1.*172.16.1.1
+    Telnet Run    ${dut1}    conf t; no log instant-message memory ;no log search-engine memory;no log social-network memory;no log email memory;no log file-transfer memory;no log online-shopping memory;no log app-others memory;no log web-access memory    1
+    Telnet Run    ${dut1}    conf t;no policy 1    None
+    Remote Run keyword    ${server_uri}    stop_http_serv
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.0.100    255.255.255.0
+    Remote Run keyword    ${client_uri}    win_gw_del    test    172.16.0.1
+    Remote Run keyword    ${server_uri}    win_set_static_ip    test    172.16.1.100    255.255.255.0
+    Remote Run keyword    ${server_uri}    win_gw_del    test    172.16.1.1
+    Audit Drop Tables    ${dut1}

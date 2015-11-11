@@ -1,0 +1,9 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+前置条件
+    [Tags]    pass
+    Remote Run Keyword    ${client_uri}    win_set_static_dns    test    172.16.1.254    #配置test网卡的静态dns
+    Telnet Ros Run    ${ros}    ip dns static add address=172.16.1.100 name=www.sunyainfo.com;ip dns static add address=172.16.1.100 name=dy.qq.com;ip dns static add address=172.16.1.100 name=www.sunyainfo1.com;ip dns static add address=172.16.1.100 name=www.sunyainfo2.com    1    #在ros上添加静态host
+    Remote Run Keyword    ${client_uri}    win_clean_dns_cache    #删除dns缓存

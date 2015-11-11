@@ -1,0 +1,47 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+url分类内容为空
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;url-category url1 description;end;show url-category    1    url1    #添加url-obj
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 url1 any permit information always enable;end;show web-policy    1    url1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    dy.qq.com    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    0    dy.qq.com    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Telnet Run    ${dut1}    conf t;no url-category url1
+
+修改url分类内容
+    [Tags]
+    Telnet Run    ${dut1}    conf t;url-category url1 description;url dy.qq.com;end;show url-category    1    url1    #添加url-obj
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 url1 any permit information always enable;end;show web-policy    1    url1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    dy.qq.com    None    /123?test=123    GET
+    ...    1    #client访问server
+    Sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    dy.qq.com    #查找数据库
+    Remote Run Keyword    ${client_uri}    http_cli    www.sunyainfo1.com    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    0    www.sunyainfo1.com    #查找数据库
+    Telnet Run    ${dut1}    conf t;url-category url1 description;no url dy.qq.com;url www.sunyainfo1.com;end;show url-category    1    sunyainfo1.com    #修改url-obj
+    sleep    2    waite for configure take effect
+    Remote Run Keyword    ${client_uri}    http_cli    dy.qq.com    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    0    (.*dy.qq.com.*\n){2}    #查找数据库
+    Remote Run Keyword    ${client_uri}    http_cli    www.sunyainfo1.com    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    www.sunyainfo1.com    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Telnet Run    ${dut1}    conf t;no url-category url1

@@ -1,0 +1,7 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+后置条件
+    [Tags]    pass
+    Telnet Ros Run    ${ros}    ip dns static remove 0;ip dns static remove 0;ip dns static remove 0

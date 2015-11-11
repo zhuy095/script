@@ -1,0 +1,76 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+合并时间为1s测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-log interval 1; end; show audit-log interval    1    audit-log interval.*1[^0-9]    #配置日志合并时间
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    file-transfer    #配置审计策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    0.5    #等待0.5s，不到1s
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test.iso.*\n){1}    #产生1条日志
+    Audit Mysql Table Clear    ${dut1}    file_transfer    #清空日志
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #使用ftp验证策略功能
+    sleep    1    #等待1s以后
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test1.iso.*\n){2}    #产生2条日志
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1; audit-log interval 1
+
+合并时间为300s测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-log interval 301    0    #配置日志合并时间大于300，报错
+    Telnet Run    ${dut1}    conf t; audit-log interval 301;end;show audit-log interval    0    301    #配置日志合并时间为301
+    Telnet Run    ${dut1}    conf t; audit-log interval 300; end; show audit-log interval    1    audit-log interval.*300[^0-9]    #配置日志合并时间
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    file-transfer    #配置审计策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    200    #等待0.5s，不到1s
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    50
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test.iso.*\n){1}    #产生1条日志
+    sleep    52
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test.iso.*\n){2}    #产生2条日志
+    sleep    300    waite for log timeout
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1; audit-log interval 1
+
+文件共享日志合并测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-log interval 15; end; show audit-log interval    1    audit-log interval.*15[^0-9]    #配置日志合并时间
+    sleep    15
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    file-transfer    #配置审计策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    10    #等待12s，不到15s
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test.iso.*\n){1}    #产生1条日志
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1;audit-log interval 1
+
+合并时间默认15s测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; audit-log interval 15; end; show audit-log interval    1    audit-log interval.*15[^0-9]    #配置日志合并时间
+    sleep    15
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    file-transfer    #配置审计策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    10    #等待12s，不到15s
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    (.*test.iso.*\n.*test1.iso.*){1}    #产生1条日志
+    sleep    5    #等待5s以后
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    test\.iso.*\n.*\n.*test\.iso    #产生2条日志
+    [Teardown]    Run Keywords    Audit Mysql Table Clear    ${dut1}    file_transfer
+    ...    AND    Telnet Run    ${dut1}    conf t; no audit-policy 1;audit-log interval 1

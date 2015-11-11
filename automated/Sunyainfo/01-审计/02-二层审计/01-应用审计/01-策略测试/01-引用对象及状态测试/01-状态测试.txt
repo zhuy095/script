@@ -1,0 +1,20 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+状态修改测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable;audit instant-message;audit search-engine;audit social-network;audit email;audit file-transfer;audit online-shopping;audit other;end; show audit-policy    1    audit-policy 1    #添加配置
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test.iso    #使用ftp验证策略功能
+    Sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test.iso    #查找数据库
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any disable;show audit-policy    1    audit-policy 1.*disable    #禁用应用审计策略
+    sleep    2
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test1.iso    #使用ftp验证策略功能
+    Audit Mysql Search    ${dut1}    file_transfer    0    test1.iso    #查找数据库，为空
+    Telnet Run    ${dut1}    conf t;audit-policy 1 any any enable; show audit-policy    1    audit-policy 1.*enable    #启用应用审计策略
+    Remote Run Keyword    ${client_uri}    ftp_file    172.16.1.100    test2.iso    #使用ftp验证策略功能
+    sleep    2
+    Audit Mysql Search    ${dut1}    file_transfer    1    172.16.1.10.*172.16.1.100.*21.*FTP.*anonymous.*test2.iso    #查找数据，不为空
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no audit-policy 1
+    ...    AND    Audit Mysql Table clear    ${dut1}

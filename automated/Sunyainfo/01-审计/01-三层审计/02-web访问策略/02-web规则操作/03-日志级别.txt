@@ -1,0 +1,60 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+不记录日志
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit ignore always enable;end;show web-policy    1    rule.*permit    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    None    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    0    http:\/\/172.16.1.100    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+日志级别信息
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit information always enable;end;show web-policy    1    rule.*permit    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    None    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    http:\/\/172.16.1.100.*pass +6    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+日志级别告警
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit warnings always enable;end;show web-policy    1    rule.*warnings    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80.*pass +4    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+日志级别修改
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit information always enable;end;show web-policy    1    rule.*permit.*information    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80.*pass +6    #查找数据库
+    Telnet Run    ${dut1}    conf t; web-policy 1 ;rule 1 any any permit warnings always enable;end;show web-policy    1    rule.*permit.*warnings    #modify web-policy
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100:80.*pass +4    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access

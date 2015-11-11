@@ -1,0 +1,151 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+引用用户any
+    [Tags]    pass
+    [Timeout]    2 minutes
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable; rule 1 any any permit \ information always enable;end; show web-policy    1    web-policy 1.*enable    #添加web审计策略
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    (172.16.1.10.*http:\/\/172.16.1.100){1}    #查找数据库
+    Audit Mysql Search    ${dut1}    web_access    0    (172.16.1.10.*http:\/\/172.16.1.100){2}    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+引用空用户
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;end ; show user    1    usera.*[^(172.16.1.10)]    #添加用户usera
+    Telnet Run    ${dut1}    conf t; web-policy 1 usera any enable; rule 1 any any permit \ information always enable;end; show web-policy    1    web-policy 1.*usera    #添加web审计策略
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.10    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+引用修改用户到用户
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;exit;user-local userb;enable;enable bind;bind ip address 172.16.1.101    #添加用户usera和userb
+    Telnet Run    ${dut1}    conf t; web-policy 1 usera any enable; rule 1 any any permit \ information always enable;end; show web-policy    1    web-policy 1.*usera    #添加web审计策略
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.10    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP为userb的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.101    #查找数据库
+    Telnet Run    ${dut1}    conf t; web-policy 1 userb any enable;end; show web-policy    1    web-policy 1.*userb    #添加web审计策略
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0    #修改client的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    0    (.*172.16.1.10.*\n){2}    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP为userb的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.101    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Sleep    2
+    ...    AND    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+    ...    AND    Telnet Run    ${dut1}    conf t; no user-local usera; no user-local userb    1
+
+引用用户修改到用户组
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;exit;user-local userb;enable;enable bind;bind ip address 172.16.1.101;exit;user-group usergroupa;member usera;member userb;end    #添加用户usera和usergruopa
+    Telnet Run    ${dut1}    conf t; web-policy 1 usera any enable; rule 1 any any permit information always enable;end; show web-policy    1    web-policy 1.*usera    #添加web审计策略
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.10    #查找数据库
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.10    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP为userb的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.101    #查找数据库
+    Telnet Run    ${dut1}    conf t; web-policy 1 usergroupa any enable;end; show web-policy    1    web-policy 1.*usergroupa    #添加web审计策略
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10    255.255.255.0    #修改client的IP为userb的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    (.*172.16.1.10.*\n){2}    #查找数据库
+    Remote Run keyword    ${client_uri}    win_set_static_ip    test    172.16.1.101    255.255.255.0    #修改client的IP为userb的IP
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.101    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1;no user-group usergroupa
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Remote Run Keyword    ${client_uri}    win_set_static_ip    test    172.16.1.10
+    ...    255.255.255.0
+    ...    AND    sleep    2
+    ...    AND    Telnet Run    ${dut1}    conf t; no user-local usera; no user-local userb    1
+
+引用删除用户
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;end ; show user    1    usera.*(172.16.1.10)    #添加用户usera和userb
+    Telnet Run    ${dut1}    conf t; web-policy 1 usera any enable; rule 1 any any permit \ information always enable;end; show web-policy    1    web-policy 1.*usera    #添加web审计策略
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2    wait for write log in mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.10    #查找数据库
+    Telnet Run    ${dut1}    conf t; no user-local usera    0    #删除被引用的user失败
+    Telnet Run    ${dut1}    show web-policy    1    web-policy 1.*usera
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2    wait for write log in mysql
+    Audit Mysql Search    ${dut1}    web_access    1    (.*172.16.1.10.*\n){2}    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Telnet Run    ${dut1}    conf t;no user-local usera    1
+
+删除用户，新增同名用户
+    [Tags]    pass
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;end ; show user    1    usera.*(172.16.1.10)    #添加用户usera和userb
+    Telnet Run    ${dut1}    conf t; web-policy 1 usera any enable; rule 1 any any permit \ information always enable;end; show web-policy    1    web-policy 1.*usera    #添加web审计策略
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.10    #查找数据库
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2    wait for write log in mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.10    #查找数据库
+    Telnet Run    ${dut1}    conf t; no user-local usera    0    #删除被引用的user失败
+    Telnet Run    ${dut1}    show web-policy    1    web-policy 1.*usera
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2    wait for write log in mysql
+    Audit Mysql Search    ${dut1}    web_access    1    (.*172.16.1.10.*\n){2}    #查找数据库
+    Telnet Run    ${dut1}    conf t;no web-policy 1    1
+    sleep    1
+    Telnet Run    ${dut1}    conf t;no user-local usera    1
+    Telnet Run    ${dut1}    conf t;user-local usera;enable;enable bind;bind ip address 172.16.1.10;end ; show user    1    usera.*(172.16.1.10)    #添加用户usera和userb
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    80    /test?123    GET
+    ...    1    #client访问server，返回禁止访问页面
+    sleep    2    wait for write log in mysql
+    Audit Mysql Search    ${dut1}    web_access    0    (.*172.16.1.10.*\n){3}    #查找数据库
+    [Teardown]    Run Keywords    Telnet Run    ${dut1}    conf t; no web-policy 1    None
+    ...    AND    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    sleep    1
+    ...    AND    Telnet Run    ${dut1}    no user-local usera    None

@@ -1,0 +1,38 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+网站访问日志级别为信息测试
+    [Tags]    pass
+    Telnet Run    ${dut1}    show log-config    1    web-access.*informational    #查看当前log级别
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit information always enable;end;show web-policy    1    web-policy 1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    172.16.1.100.*6    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+
+网站访问日志级别为通知
+    [Tags]    pass
+    Telnet Run    ${dut1}    show log-config    1    web-access.*informational    #查看当前log级别
+    Telnet Run    ${dut1}    conf t;log web-access memory upto notifications;end;show log-config    1    web-access.*notifications    #查看当前log级别
+    Telnet Run    ${dut1}    conf t; web-policy 1 any any enable;rule 1 any any permit information always enable;end;show web-policy    1    web-policy 1    #添加web-policy
+    Remote Run Keyword    ${server_uri}    http_serv    #启用http server
+    sleep    1    waite for http ser start
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    0    172.16.1.100.*5    #查找数据库
+    Telnet Run    ${dut1}    conf t; web-policy 1;rule 1 any any permit notifications always enable;end;show web-policy    1    notifications    #添加web-policy
+    Remote Run Keyword    ${client_uri}    http_cli    172.16.1.100    None    /123?test=123    GET
+    ...    1    #client访问server
+    sleep    2    waite for log write mysql
+    Audit Mysql Search    ${dut1}    web_access    1    http:\/\/172.16.1.100.*pass +5    #查找数据库
+    [Teardown]    Run Keywords    Remote Run Keyword    ${server_uri}    stop_http_serv
+    ...    AND    Telnet Run    ${dut1}    conf t;no web-policy 1
+    ...    AND    Audit Mysql Table Clear    ${dut1}    web_access
+    ...    AND    Telnet Run    ${dut1}    conf t;log web-access memory upto informational

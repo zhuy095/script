@@ -1,0 +1,15 @@
+*** Settings ***
+Library           AutomatedLib
+
+*** Test Cases ***
+更新关键字
+    [Tags]    bug
+    Updatelib    ${server}    11211
+    Updatelib    ${client}    11211
+
+清空所有配置
+    [Tags]    pass    bug
+    Clear All Conf    192.168.2.200    10002    ${dut1}
+    #Clear All Conf    192.168.2.200    ${dut2}
+    Remote Run Keyword    ${client_uri}    win_set_dhcp_ip    test
+    Remote Run Keyword    ${server_uri}    win_set_dhcp_ip    test
