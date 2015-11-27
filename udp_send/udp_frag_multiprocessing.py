@@ -98,7 +98,7 @@ def get_send_pcaps(srcips,destips,srcports,destports,smac,dmac,load):
                 for destport in destports:
                     srcport=int(srcport)
                     destport=int(destport)
-                    pcaps.append(str(Ether(dst=dmac,src=smac)/IP(src=srcip,dst=destip)/UDP(sport=srcport,dport=destport,)/load))
+                    pcaps.append(str(Ether(dst=dmac,src=smac)/IP(src=srcip,dst=destip,flags=0,frag=176L)/UDP(sport=srcport,dport=destport,)/load))
     print("prepare pcaps complete!")
     return pcaps
 
