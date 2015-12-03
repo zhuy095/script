@@ -49,7 +49,7 @@ class winpc_keyword(object):
         print("%s"%unicode(msg,global_encoding))
         self.win_show_ip(inter='test',searchip=gw)
         
-    def win_gw_del(self,inter='test',gw=None,metric=1):
+    def win_gw_del(self,inter='test',gw=None):
         print("run keyword:%s"%(sys._getframe().f_code.co_name))
         msgs=[]
         cmd='netsh interface ip del address "'+str(inter)+'" gateway='+str(gw)
