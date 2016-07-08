@@ -93,32 +93,39 @@ def l2_send_pack(repcap):
         tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
         tcpreplay_pipe.wait()
         if tcpreplay_pipe.returncode!=0:
-            print "packet: ",repcap," replay failed"
-            print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-            print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
+            print "packet: ",repcap," replay failed",tcpreplay_pipe.stderr.read()
+            #print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+            #print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
     else:
-        print "tcpprep error pcap:",repcap
-        print "tcpprep error info:",tcpprep_pipe.stderr.read()
+        print "tcpprep error pcap:",repcap,tcpreplay_pipe.stderr.read()
+        #print "tcpprep error info:",tcpprep_pipe.stderr.read()
 
+#def l2_send_packs(pcap_files):
+#    time_span=0.2
+#    threads=[]
+#    thread_num=0
+#    for repcap in pcap_files:
+#        thread=threading.Thread(target=l2_send_pack,args=(repcap,))
+#        thread.setDaemon(True)
+#        threads.append(thread)
+#        thread.start()
+#        thread_num+=1
+#        while int(thread_num) >= int(concurrent):
+#            time.sleep(time_span)
+#            thread_num=len(threads)
+#            thread_num=thread_alive_num(threads)
+#    time.sleep(1)
+#    print "\nwaiting for tcpreplay complite!!\n"
+#    while int(thread_num) != int(0):
+#        time.sleep(time_span)
+#        thread_num=thread_alive_num(threads)
 def l2_send_packs(pcap_files):
-    time_span=0.2
-    threads=[]
-    thread_num=0
-    for repcap in pcap_files:
-        thread=threading.Thread(target=l2_send_pack,args=(repcap,))
-        thread.setDaemon(True)
-        threads.append(thread)
-        thread.start()
-        thread_num+=1
-        while int(thread_num) >= int(concurrent):
-            time.sleep(time_span)
-            thread_num=len(threads)
-            thread_num=thread_alive_num(threads)
-    time.sleep(1)
+    pool=multiprocessing.Pool(int(concurrent))
+    for pcap in pcap_files:
+    	pool.apply_async(l2_send_pack,args=(pcap,))
+    pool.close()
+    pool.join()
     print "\nwaiting for tcpreplay complite!!\n"
-    while int(thread_num) != int(0):
-        time.sleep(time_span)
-        thread_num=thread_alive_num(threads)
 
 
 def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,sour_start_ip):
@@ -140,15 +147,15 @@ def l3_send_pack(repcap,ser_mac_d,cli_mac_d,ser_mac_s,cli_mac_s,dest_start_ip,so
             tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
             tcpreplay_pipe.wait()
             if tcpreplay_pipe.returncode!=0:
-                print "packet: ",repcap," replay failed"
-                print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-                print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
+                print "packet: ",repcap," replay failed",tcpreplay_pipe.stderr.read()
+                #print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+                #print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
         else:
-            print "tcprewrite error pcap:",repcap
-            print "tcprewrite error info:",tcprewrite_pipe.stderr.read()
+            print "tcprewrite error pcap:",repcap,tcprewrite_pipe.stderr.read()
+            #print "tcprewrite error info:",tcprewrite_pipe.stderr.read()
     else:
-        print "tcpprep error pcap:",repcap
-        print "tcpprep error info:",tcpprep_pipe.stderr.read()    
+        print "tcpprep error pcap:",repcap,tcprewrite_pipe.stderr.read()
+        #print "tcpprep error info:",tcpprep_pipe.stderr.read()    
 
 def l3_send_packs(pcap_files):
     s_ip=get_ip(sour_start_ip,sour_ip_num)

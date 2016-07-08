@@ -76,8 +76,8 @@ def distinguish_pcap(repcap,cache):
     tcpprep_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcpprep_pipe.wait()
     if tcpprep_pipe.returncode !=0 :
-        print "tcpprep error pcap:",repcap
-        print "tcpprep error info:",tcpprep_pipe.stderr.read()
+        print "tcpprep error pcap:",repcap,tcpreplay_pipe.stderr.read()
+        #print "tcpprep error info:",tcpprep_pipe.stderr.read()
     tcpprep_pipe.terminate()
 
 def sendto_pcap(cache,cinter,sinter,repcap):
@@ -87,9 +87,9 @@ def sendto_pcap(cache,cinter,sinter,repcap):
     tcpreplay_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcpreplay_pipe.wait()
     if tcpreplay_pipe.returncode!=0:
-        print "packet: ",repcap," replay failed"
-        print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
-        print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
+        print "packet: ",repcap," replay failed",tcpreplay_pipe.stderr.read()
+        #print "tcpreplay stdout: ",tcpreplay_pipe.stdout.read()
+        #print "tcpreplay stderr: ",tcpreplay_pipe.stderr.read()
     tcpreplay_pipe.terminate()
 
 def modify_pcap(cli_mac_d,ser_mac_d,cli_mac_s,ser_mac_s,sour_start_ip,dest_start_ip,cache,repcap,send_pcap):
@@ -98,8 +98,8 @@ def modify_pcap(cli_mac_d,ser_mac_d,cli_mac_s,ser_mac_s,sour_start_ip,dest_start
     tcprewrite_pipe=subprocess.Popen(cmd,stdin = subprocess.PIPE,stdout = subprocess.PIPE, stderr = subprocess.PIPE,shell=True)
     tcprewrite_pipe.wait()
     if tcprewrite_pipe.returncode !=0 :
-        print "tcprewrite error pcap:",repcap
-        print "tcprewrite error info:",tcprewrite_pipe.stderr.read() 
+        print "tcprewrite error pcap:",repcap,tcpreplay_pipe.stderr.read()
+        #print "tcprewrite error info:",tcprewrite_pipe.stderr.read() 
     tcprewrite_pipe.terminate()
 
 def l2_send_pack(repcap):
