@@ -32,6 +32,7 @@ dest_start_ip=find_value("ser_start_ip")
 dest_ip_num=find_value("ser_ip_num")
 concurrent=find_value("concurrent")
 loop_num=find_value("loop_num")
+isloop=find_value("isloop")
 
 def get_ip(ip,num):
     ip_new_list=[]
@@ -158,12 +159,24 @@ signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGHUP, handler)
 signal.signal(signal.SIGTERM, handler)
 
-
-if int(mode) == int(2):
-    l2_send_packs(get_file_path(path))
-elif int(mode) == int(3):
-    l3_send_packs(get_file_path(path))
-else:
-    print "replay.conf mode error"
-    exit(255)
-
+if __name__ == '__main__':
+    if isloop=='True':
+        while True:
+            if int(mode) == int(2):
+                l2_send_packs(get_file_path(path))
+            elif int(mode) == int(3):
+                l3_send_packs(get_file_path(path))
+            else:
+                print "replay.conf mode error"
+                exit(255)
+    elif isloop == 'False':
+        if int(mode) == int(2):
+            l2_send_packs(get_file_path(path))
+        elif int(mode) == int(3):
+            l3_send_packs(get_file_path(path))
+        else:
+            print "replay.conf mode error"
+            exit(255)
+    else:
+        print("loop error")
+        exit(255)
