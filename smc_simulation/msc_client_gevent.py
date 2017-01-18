@@ -114,15 +114,16 @@ def headles(local_ip,dest_ip,core):
         if data is None :
             pack=vfw.send_pack()
             sock.sendto(pack,dest_ip)
+            print("from %s  connect to %s "%(str(sock.getsockname()),str(dest_ip)))
         else :
             pack=vfw.unpack_header(data)
             if type(pack) == tuple :
                 for i in range(len(pack)):
                     sock.sendto(pack[i],dest_ip)
-        print("from %s  connect to %s "%(str(local_ip),str(dest_ip)))
+            print("from %s  connect to %s "%(str(sock.getsockname()),str(address)))
                     
 def run_main(ip_list,dest_ip,core):
-    even=[]
+    even=[]  #事件驱动，存放事件
     #gevent.joinall([
     #gevent.spawn(headles,ip_list[0],dest_ip,core),
     #gevent.spawn(headles,ip_list[1],dest_ip,core)
@@ -143,7 +144,5 @@ if __name__ == '__main__' :
     core=4
     ip_num=300
     ip_list=ip_change(local_ip,ip_num)
-    
     pdb.set_trace()
-    #vfw_objs=vfwScoket(ip_list)  #生成vfw和socket的对应关系
     run_main(ip_list,dest,core)
